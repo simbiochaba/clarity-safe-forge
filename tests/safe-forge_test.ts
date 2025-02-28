@@ -44,7 +44,7 @@ Clarinet.test({
 });
 
 Clarinet.test({
-  name: "Can deploy contract from template",
+  name: "Can deploy contract from active template",
   async fn(chain: Chain, accounts: Map<string, Account>) {
     const owner = accounts.get("deployer")!;
     const user = accounts.get("wallet_1")!;
@@ -72,5 +72,45 @@ Clarinet.test({
     
     block.receipts[0].result.expectOk().expectUint(1);
     block.receipts[1].result.expectOk().expectUint(1);
+  }
+});
+
+Clarinet.test({
+  name: "Cannot deploy from inactive template",
+  async fn(chain: Chain, accounts: Map<string, Account>) {
+    const owner = accounts.get("deployer")!;
+    const user = accounts.get("wallet_1")!;
+    
+    let block = chain.mineBlock([
+      Tx.contractCall(
+        "safe-forge",
+        "add-template",
+        [
+          types.ascii("Test Template"),
+          types.utf8("(contract-code)")
+        ],
+        owner.address
+      ),
+      Tx.contractCall(
+        "safe-forge",
+        "update-template-status",
+        [
+          types.uint(1),
+          types.bool(false)
+        ],
+        owner.address
+      ),
+      Tx.contractCall(
+        "safe-forge",
+        "deploy-contract",
+        [
+          types.uint(1),
+          types.list([types.utf8("param1"), types.utf8("param2")])
+        ],
+        user.address
+      )
+    ]);
+    
+    block.receipts[2].result.expectErr(104); // err-inactive-template
   }
 });
