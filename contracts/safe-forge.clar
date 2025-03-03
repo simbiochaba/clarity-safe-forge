@@ -1,11 +1,18 @@
 ;; SafeForge Contract
 
-;; Constants
+;; Error Constants
+;; Access Control
 (define-constant contract-owner tx-sender)
 (define-constant err-owner-only (err u100))
+
+;; Template Management
 (define-constant err-template-exists (err u101))
 (define-constant err-template-not-found (err u102))
+
+;; Parameter Validation
 (define-constant err-invalid-params (err u103))
+(define-constant err-inactive-template (err u104))
+(define-constant err-empty-params (err u105))
 
 ;; Data vars
 (define-map templates 
@@ -48,27 +55,47 @@
           }
         )
         (var-set template-counter template-id)
+        (print { type: "template-added", template-id: template-id, name: name })
         (ok template-id))
       err-owner-only)))
+
+(define-public (update-template-status (template-id uint) (active bool))
+  (if (is-eq tx-sender contract-owner)
+    (match (map-get? templates { template-id: template-id })
+      template (begin
+        (map-set templates
+          { template-id: template-id }
+          (merge template { is-active: active })
+        )
+        (print { type: "template-status-updated", template-id: template-id, active: active })
+        (ok true))
+      err-template-not-found)
+    err-owner-only))
 
 (define-public (deploy-contract 
   (template-id uint) 
   (params (list 10 (string-utf8 256))))
   (let ((deployment-id (+ (var-get deployment-counter) u1)))
     (match (map-get? templates { template-id: template-id })
-      template (begin
-        (map-set deployments
-          { deployment-id: deployment-id }
-          {
-            template-id: template-id,
-            owner: tx-sender,
-            params: params,
-            timestamp: block-height
-          }
-        )
-        (var-set deployment-counter deployment-id)
-        (ok deployment-id))
-      (err err-template-not-found))))
+      template 
+      (if (get is-active template)
+        (if (> (len params) u0)
+          (begin
+            (map-set deployments
+              { deployment-id: deployment-id }
+              {
+                template-id: template-id,
+                owner: tx-sender,
+                params: params,
+                timestamp: block-height
+              }
+            )
+            (var-set deployment-counter deployment-id)
+            (print { type: "contract-deployed", deployment-id: deployment-id, template-id: template-id })
+            (ok deployment-id))
+          err-empty-params)
+        err-inactive-template)
+      err-template-not-found)))
       
 ;; Read only functions
 (define-read-only (get-template (template-id uint))
