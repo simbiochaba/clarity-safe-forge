@@ -114,3 +114,34 @@ Clarinet.test({
     block.receipts[2].result.expectErr(104); // err-inactive-template
   }
 });
+
+Clarinet.test({
+  name: "Cannot deploy contract with empty parameters",
+  async fn(chain: Chain, accounts: Map<string, Account>) {
+    const owner = accounts.get("deployer")!;
+    const user = accounts.get("wallet_1")!;
+    
+    let block = chain.mineBlock([
+      Tx.contractCall(
+        "safe-forge",
+        "add-template",
+        [
+          types.ascii("Test Template"),
+          types.utf8("(contract-code)")
+        ],
+        owner.address
+      ),
+      Tx.contractCall(
+        "safe-forge",
+        "deploy-contract",
+        [
+          types.uint(1),
+          types.list([])
+        ],
+        user.address
+      )
+    ]);
+    
+    block.receipts[1].result.expectErr(105); // err-empty-params
+  }
+});
