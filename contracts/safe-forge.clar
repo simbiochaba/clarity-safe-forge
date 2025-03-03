@@ -1,12 +1,18 @@
 ;; SafeForge Contract
 
-;; Constants
+;; Error Constants
+;; Access Control
 (define-constant contract-owner tx-sender)
 (define-constant err-owner-only (err u100))
+
+;; Template Management
 (define-constant err-template-exists (err u101))
 (define-constant err-template-not-found (err u102))
+
+;; Parameter Validation
 (define-constant err-invalid-params (err u103))
 (define-constant err-inactive-template (err u104))
+(define-constant err-empty-params (err u105))
 
 ;; Data vars
 (define-map templates 
@@ -73,19 +79,21 @@
     (match (map-get? templates { template-id: template-id })
       template 
       (if (get is-active template)
-        (begin
-          (map-set deployments
-            { deployment-id: deployment-id }
-            {
-              template-id: template-id,
-              owner: tx-sender,
-              params: params,
-              timestamp: block-height
-            }
-          )
-          (var-set deployment-counter deployment-id)
-          (print { type: "contract-deployed", deployment-id: deployment-id, template-id: template-id })
-          (ok deployment-id))
+        (if (> (len params) u0)
+          (begin
+            (map-set deployments
+              { deployment-id: deployment-id }
+              {
+                template-id: template-id,
+                owner: tx-sender,
+                params: params,
+                timestamp: block-height
+              }
+            )
+            (var-set deployment-counter deployment-id)
+            (print { type: "contract-deployed", deployment-id: deployment-id, template-id: template-id })
+            (ok deployment-id))
+          err-empty-params)
         err-inactive-template)
       err-template-not-found)))
       
